@@ -1,0 +1,7 @@
+{
+  "name": "quickreader-demo",
+  "version": "0.0.1",
+  "files": [
+    "*.bin"
+  ]
+}
