@@ -68,7 +68,7 @@ for (let i = 0; i < 1e7; i++) {
 console.timeEnd('await')      // Chrome: ~800ms, Safari: ~3000ms
 ```
 
-https://jsbin.com/gehazin/edit?html,console
+https://jsbin.com/gehazin/edit?html,output
 
 The above two cases do the same thing, but the await one is 50x to 200x slower than the no-await. On Chrome it's even ~2000x slower if the console is open (only ~500 await/ms).
 
