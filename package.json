@@ -1,6 +1,6 @@
 {
   "name": "quickreader",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "a high-performance stream reader",
   "repository": {
     "type": "git",
