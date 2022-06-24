@@ -463,8 +463,8 @@ export class QuickReader {
     u16Le: to_num_t = (buf, pos) => buf[pos]      | buf[pos + 1] << 8,
     u16Be: to_num_t = (buf, pos) => buf[pos] << 8 | buf[pos + 1],
 
-    i16Le: to_num_t = (buf, pos) => u16Le(buf, pos) << 16 >> 16,
-    i16Be: to_num_t = (buf, pos) => u16Be(buf, pos) << 16 >> 16,
+    i16Le: to_num_t = (buf, pos) => buf[pos]             | buf[pos + 1] << 24 >> 16,
+    i16Be: to_num_t = (buf, pos) => buf[pos] << 24 >> 16 | buf[pos + 1],
 
     u32Le: to_num_t = (buf, pos) => i32Le(buf, pos) >>> 0,
     u32Be: to_num_t = (buf, pos) => i32Be(buf, pos) >>> 0,
