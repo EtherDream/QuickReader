@@ -432,9 +432,6 @@ export class QuickReader {
   public declare f32: () => number | undefined
   public declare f64: () => number | undefined
 
-  public declare u8be: () => number | undefined
-  public declare i8be: () => number | undefined
-
   public declare u16be: () => number | undefined
   public declare i16be: () => number | undefined
 
