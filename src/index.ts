@@ -451,7 +451,7 @@ export class QuickReader {
 
     const
     MEM_BUF = new ArrayBuffer(8),
-    MEM_I32 = new Uint32Array(MEM_BUF),
+    MEM_I32 = new Int32Array(MEM_BUF),
     MEM_U64 = new BigUint64Array(MEM_BUF),
     MEM_I64 = new BigInt64Array(MEM_BUF),
     MEM_F64 = new Float64Array(MEM_BUF),
