@@ -179,6 +179,21 @@ More broadly, any `AsyncIterable<Uint8Array>` can be passed as a stream.
 
 More: [index.d.ts](typings/index.d.ts)
 
+
+# Usage Rules
+
+The `?? await A` must be executed immediately after each reading, otherwise something will go wrong. 
+
+It is better to use TypeScript. When you forget to add `?? await A`, the type of result will be unioned with `undefined`, which makes it easier to expose the issue.
+
+```js
+const id = reader.u32()   // number | undefined
+id.toString()             // ❌
+```
+
+Since the `A` is consumed immediately after it is generated, even if there are multiple `QuickReader` instances, they will not conflict with each other.
+
+
 # Concurrency
 
 The same reader is not allowed to be called by multiple co-routines in parallel, as this would break the waiting order. Therefore, the following logic should not be used:
