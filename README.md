@@ -177,6 +177,8 @@ More broadly, any `AsyncIterable<Uint8Array>` can be passed as a stream.
 
 * f{32, 64, 32be, 64be}() : `number`
 
+> `u`: unsigned integer, `i`: signed integer, `f`: float, `be`: big endian
+
 More: [index.d.ts](typings/index.d.ts)
 
 
