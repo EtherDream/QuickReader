@@ -12,7 +12,33 @@ export class QuickReaderError extends Error {
   public readonly code: QuickReaderErrorCode
 }
 
-export class QuickReader {
+export class QuickReader<T extends Uint8Array = Uint8Array> {
+  /**
+    `stream` can be a NodeStream or WebStream.
+
+    If the chunk type of the stream is not clear, you need to specify
+    the `T` manually, so that the same type can be obtained when reading
+    a buffer:
+
+    ```ts
+    const reader1 = new QuickReader<Buffer>(getStreamSomeHow())
+    reader1.bytes(10) ?? await A    // Buffer {...}
+
+    const reader2 = new QuickReader<Uint8Array>(getStreamSomeHow())
+    reader2.bytes(10) ?? await A    // Uint8Array {...}
+    ```
+   */
+  public constructor(stream: AsyncIterable<T> | ReadableStream<T>)
+
+  /**
+    A callback function for allocating a buffer, will be called when
+    reading a buffer across multiple chunks.
+
+    By default, `Buffer.allocUnsafe(len)` is used in Node.js and
+    `new Uint8Array(len)` is used in the browser.
+   */
+  public allocator: (len: number) => T
+
   /**
     Indicates whether the stream is closed and the buffer is empty.
 
@@ -31,10 +57,9 @@ export class QuickReader {
   public eofAsDelim: boolean
 
   /**
-    NodeStream and WebStream both supported.
+    Read a chunk from the stream.
    */
-  public constructor(
-    stream: AsyncIterable<Uint8Array> | ReadableStream<Uint8Array>)
+  public chunk() : Promise<T>
 
   /**
     Read *len* bytes.
@@ -47,7 +72,7 @@ export class QuickReader {
     before using it, e.g. `result.slice()`; otherwise the underlying buffer
     will not be GCed.
    */
-  public bytes(len: number) : Uint8Array | undefined
+  public bytes(len: number) : T | undefined
 
   /**
     Read the bytes before *delim*. The delimiter will be consumed, but not
@@ -63,7 +88,7 @@ export class QuickReader {
 
     Like the `bytes` method, this method also needs to consider the GC issue.
    */
-  public bytesTo(delim: number) : Uint8Array | undefined
+  public bytesTo(delim: number) : T | undefined
 
   /**
     Read *len* bytes and return the length.
@@ -166,5 +191,5 @@ export class QuickReader {
     This is only used for simple processing, pipe the original stream to a
     transform stream is the standard way.
    */
-  protected _pull() : Promise<Uint8Array | undefined>
+  protected _pull() : Promise<T | undefined>
 }

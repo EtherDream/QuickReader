@@ -11,7 +11,8 @@ describe('bytes', () => {
     expect(r1).toBe(undefined)
 
     // [10, 11]
-    expect('' + await A).toBe([10, 11] + '')
+    const result = (await A) as Buffer
+    expect(result.join()).toBe([10, 11] + '')
   })
 
   it('from buffer', async () => {
@@ -22,7 +23,7 @@ describe('bytes', () => {
 
     // [11, 12]
     const r1 = reader.bytes(2)
-    expect('' + r1).toBe([11, 12] + '')
+    expect(r1!.join()).toBe([11, 12] + '')
   })
 
   it('chunks concat', async () => {
@@ -32,7 +33,7 @@ describe('bytes', () => {
       [30, 31, 32],
     ])
     const r1 = reader.bytes(9) ?? await A
-    expect('' + r1).toBe([
+    expect(r1.join()).toBe([
       10, 11, 12,
       20, 21, 22,
       30, 31, 32
@@ -50,11 +51,13 @@ describe('bytes', () => {
     // [14]
     const r1 = reader.bytes(1)
     expect(r1).toBe(undefined)
-    expect('' + await A).toBe([14] + '')
+
+    const result1 = (await A) as Buffer
+    expect(result1.join()).toBe([14] + '')
 
     // [20, 21]
     const r2 = reader.bytes(2)
-    expect('' + r2).toBe([20, 21] + '')
+    expect(r2!.join()).toBe([20, 21] + '')
   })
 
   it('chunk used up', async () => {
@@ -68,11 +71,13 @@ describe('bytes', () => {
 
     const r1 = reader.bytes(6)
     expect(r1).toBe(undefined)
-    expect('' + await A).toBe([14, 20, 21, 22, 23, 24] + '')
+
+    const result = (await A) as Buffer
+    expect(result.join()).toBe([14, 20, 21, 22, 23, 24] + '')
 
     // [30, 31, 32]
     const r2 = reader.bytes(3)
-    expect('' + r2).toBe([30, 31, 32] + '')
+    expect(r2!.join()).toBe([30, 31, 32] + '')
   })
 
   it('param type', async () => {
@@ -80,7 +85,7 @@ describe('bytes', () => {
       [10, 11, 12],
     ])
     const r1 = reader.bytes('1.99' as any) ?? await A
-    expect('' + r1).toBe([10] + '')
+    expect(r1.join()).toBe([10] + '')
   })
 
   it('read byte', async () => {
@@ -89,10 +94,12 @@ describe('bytes', () => {
     ])
     const r1 = reader.bytes(0)
     expect(r1).toBe(undefined)
-    expect('' + await A).toBe([] + '')
+
+    const result = (await A) as Buffer
+    expect(result.join()).toBe([] + '')
 
     const r2 = reader.bytes(0)
-    expect('' + r2).toBe([] + '')
+    expect(r2!.join()).toBe([] + '')
   })
 
   it('out of range', async () => {
@@ -115,14 +122,14 @@ describe('bytes', () => {
       [], [10], [], [11, 12, 13], [], [14], [], [15]
     ])
     const r1 = reader.bytes(4) ?? await A
-    expect('' + r1).toBe([10, 11, 12, 13] + '')
+    expect(r1.join()).toBe([10, 11, 12, 13] + '')
 
     const r2 = reader.bytes(1) ?? await A
-    expect('' + r2).toBe([14] + '')
+    expect(r2.join()).toBe([14] + '')
     expect(reader.eof).toBe(false)
 
     const r3 = reader.bytes(1) ?? await A
-    expect('' + r3).toBe([15] + '')
+    expect(r3.join()).toBe([15] + '')
     expect(reader.eof).toBe(true)
   })
 

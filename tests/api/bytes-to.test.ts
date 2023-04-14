@@ -11,7 +11,8 @@ describe('bytesTo', () => {
     expect(r1).toBe(undefined)
 
     // [10, 11]
-    expect('' + await A).toBe([10, 11] + '')
+    const result = (await A) as Buffer
+    expect(result.join()).toBe([10, 11] + '')
   })
 
   it('from buffer', async () => {
@@ -22,7 +23,7 @@ describe('bytesTo', () => {
 
     // [13, 0]
     const r1 = reader.bytesTo(0)
-    expect('' + r1).toBe([13] + '')
+    expect(r1!.join()).toBe([13] + '')
   })
 
   it('chunks concat', async () => {
@@ -32,7 +33,7 @@ describe('bytesTo', () => {
       [30,  0, 32],
     ])
     const r1 = reader.bytesTo(0) ?? await A
-    expect('' + r1).toBe([
+    expect(r1.join()).toBe([
       10, 11, 12,
       20, 21, 22,
       30
@@ -50,11 +51,13 @@ describe('bytesTo', () => {
     // [12, 13, 0]
     const r1 = reader.bytesTo(0)
     expect(r1).toBe(undefined)
-    expect('' + await A).toBe([12, 13] + '')
+
+    const result = (await A) as Buffer
+    expect(result.join()).toBe([12, 13] + '')
 
     // [20, 21, 22, 0]
     const r2 = reader.bytesTo(0)
-    expect('' + r2).toBe([20, 21, 22] + '')
+    expect(r2!.join()).toBe([20, 21, 22] + '')
   })
 
   it('chunk used up', async () => {
@@ -70,13 +73,15 @@ describe('bytesTo', () => {
     // [20, 21, 22, 23, 0]
     const r1 = reader.bytesTo(0)
     expect(r1).toBe(undefined)
-    expect('' + await A).toBe([
+
+    const result = (await A) as Buffer
+    expect(result.join()).toBe([
       12, 13, 14,
       20, 21, 22, 23] + '')
 
     // [30, 31, 0]
     const r2 = reader.bytesTo(0)
-    expect('' + r2).toBe([30, 31] + '')
+    expect(r2!.join()).toBe([30, 31] + '')
   })
 
   it('param type', async () => {
@@ -84,7 +89,7 @@ describe('bytesTo', () => {
       [10, 1, 12],
     ])
     const r1 = reader.bytesTo('1.99' as any) ?? await A
-    expect('' + r1).toBe([10] + '')
+    expect(r1.join()).toBe([10] + '')
   })
 
   it('read zero', async () => {
@@ -93,15 +98,19 @@ describe('bytesTo', () => {
     ])
     const r1 = reader.bytesTo(0)
     expect(r1).toBe(undefined)
-    expect('' + await A).toBe([] + '')
+
+    const result1 = (await A) as Buffer
+    expect(result1.join()).toBe([] + '')
 
     const r2 = reader.bytesTo(0)
-    expect('' + r2).toBe([] + '')
+    expect(r2!.join()).toBe([] + '')
     expect(reader.eof).toBe(false)
 
     const r3 = reader.bytesTo(0)
     expect(r3).toBe(undefined)
-    expect('' + await A).toBe([] + '')
+
+    const result3 = (await A) as Buffer
+    expect(result3.join()).toBe([] + '')
     expect(reader.eof).toBe(true)
   })
 
@@ -128,14 +137,14 @@ describe('bytesTo', () => {
       [], [10], [], [0, 12, 13], [], [0], [], [0]
     ])
     const r1 = reader.bytesTo(0) ?? await A
-    expect('' + r1).toBe([10] + '')
+    expect(r1.join()).toBe([10] + '')
 
     const r2 = reader.bytesTo(0) ?? await A
-    expect('' + r2).toBe([12, 13] + '')
+    expect(r2.join()).toBe([12, 13] + '')
     expect(reader.eof).toBe(false)
 
     const r3 = reader.bytesTo(0) ?? await A
-    expect('' + r3).toBe([] + '')
+    expect(r3.join()).toBe([] + '')
     expect(reader.eof).toBe(true)
   })
 
@@ -192,7 +201,7 @@ describe('bytesTo', () => {
     reader.eofAsDelim = true
 
     const r1 = reader.bytesTo(0) ?? await A
-    expect('' + r1).toBe([
+    expect(r1.join()).toBe([
       10, 11, 12,
       20, 21, 22] + '')
   })

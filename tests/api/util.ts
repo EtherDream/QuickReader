@@ -3,7 +3,7 @@ import {QuickReader} from '../../src/index'
 type chunk_t = Uint8Array | number[] | string[]
 
 
-export function createReader(chunks: chunk_t[], cls = QuickReader) {
+export function createReader(chunks: chunk_t[], cls = QuickReader<Uint8Array>) {
   const stream = {
     [Symbol.asyncIterator]: async function*() {
       for (const chunk of chunks) {
