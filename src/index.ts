@@ -463,6 +463,11 @@ export class QuickReader<T extends Uint8Array = Uint8Array> {
   public declare f64be: () => number | undefined
 
   static {
+    type method_name_t =
+      `${'u'|'i'}8` |
+      `${'u'|'i'}${16|32|64}${''|'be'}` |
+      `f${32|64}${''|'be'}`
+
     type to_num_t = (buf: Uint8Array, pos: number) => number
     type to_int_t = (buf: Uint8Array, pos: number) => bigint
     type fn_t = to_num_t | to_int_t
@@ -526,7 +531,7 @@ export class QuickReader<T extends Uint8Array = Uint8Array> {
       return fn(bytes, 0)
     },
 
-    addReadNumMethod = (name: keyof QuickReader, len: number, fn: fn_t) : void => {
+    addReadNumMethod = (name: method_name_t, len: number, fn: fn_t) : void => {
       (QuickReader.prototype as any)[name] = function(this: QuickReader) {
         const buf = this._buffer
         const pos = this._offset
