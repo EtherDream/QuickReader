@@ -132,6 +132,16 @@ export class QuickReader<T extends Uint8Array = Uint8Array> {
     return result
   }
 
+  public async chunk() : Promise<T> {
+    if (this._buffer === EMPTY_BUF) {
+      this._buffer = await this._pull() as T
+    }
+    const result = this._offset
+      ? this._buffer.subarray(this._offset)
+      : this._buffer
+
+    return this._pullAndReturn(result as T)
+  }
 
   public bytes(len: number) : T | undefined {
     len >>>= 0

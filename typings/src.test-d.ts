@@ -39,6 +39,11 @@ expectType< QuickReader<Uint8Array> >(uint8ArrayReader)
 
 
 {
+
+  // chunk
+  expectType<Promise<Uint8Array>>(uint8ArrayReader.chunk())
+  expectType<Promise<Buffer>>(bufferReader.chunk())
+
   // bytes
   expectType<Uint8Array | undefined>(uint8ArrayReader.bytes(10))
   expectType<Uint8Array | undefined>(uint8ArrayReader.bytesTo(32))
