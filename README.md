@@ -147,9 +147,17 @@ More broadly, any `AsyncIterable<Uint8Array>` can be passed as a stream.
 
 # API
 
+## Class
+
+* QuickReader`<T extends Uint8Array = Uint8Array>`
+
+## Constructor
+
+* new(stream: `AsyncIterable<T>` | `ReadableStream<T>`)
+
 ## By length
 
-* bytes(len: `number`) : `Uint8Array`
+* bytes(len: `number`) : `T`
 
 * skip(len: `number`) : `number`
 
@@ -157,7 +165,7 @@ More broadly, any `AsyncIterable<Uint8Array>` can be passed as a stream.
 
 ## By delimiter
 
-* bytesTo(delim: `number`) : `Uint8Array`
+* bytesTo(delim: `number`) : `T`
 
 * skipTo(delim: `number`) : `number`
 
@@ -169,7 +177,7 @@ More broadly, any `AsyncIterable<Uint8Array>` can be passed as a stream.
 
 * txtLn() : `string` - Equivalent to `txtTo(10)`.
 
-## Numbers
+## Number
 
 * {u, i}{8, 16, 32, 16be, 32be}() : `number`
 
@@ -177,10 +185,25 @@ More broadly, any `AsyncIterable<Uint8Array>` can be passed as a stream.
 
 * f{32, 64, 32be, 64be}() : `number`
 
-> `u`: unsigned integer, `i`: signed integer, `f`: float, `be`: big endian
+## Chunk
 
-More: [index.d.ts](typings/index.d.ts)
+* chunk(): `Promise<T>`
 
+## Property
+
+* eof: `boolean`
+
+* eofAsDelim: `boolean` (default `false`)
+
+## Callback
+
+* allocator: `(len: number) => T`
+
+## More
+
+See [index.d.ts](typings/index.d.ts)
+
+> Note: The generic type `T` is only used for compile-time buffer type hints, and the runtime buffer type is returned by `allocator`. By default, Node.js uses `Buffer` and the browser uses `Uint8Array`.
 
 # Usage Rules
 
