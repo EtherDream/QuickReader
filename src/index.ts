@@ -56,10 +56,6 @@ const bufToStr = (function() :
   }
 })()
 
-const DEFAULT_ALLOCATOR = HAS_NODE_BUF
-  ? Buffer.allocUnsafe
-  : (len: number) => new Uint8Array(len)
-
 
 const EMPTY_BUF = new Uint8Array(0)
 
@@ -71,8 +67,8 @@ export class QuickReader<T extends Uint8Array = Uint8Array> {
   private _offset = 0
   private _closed = false
   private _getChunk: () => Promise<{value?: T}>
+  private _isNodeBuf: boolean | undefined
 
-  public allocator = DEFAULT_ALLOCATOR
   public eofAsDelim = false
 
 
@@ -94,13 +90,20 @@ export class QuickReader<T extends Uint8Array = Uint8Array> {
     if (this._closed) {
       throw new QuickReaderError(QuickReaderErrorCode.NO_MORE_DATA)
     }
+    let chunk: T | undefined
+
     try {
       const {value} = await this._getChunk()
-      return value
+      chunk = value
     } catch (err: any) {
       this._close()
       throw new QuickReaderError(QuickReaderErrorCode.FAILED_TO_PULL, err?.message)
     }
+
+    if (this._isNodeBuf === undefined) {
+      this._isNodeBuf = HAS_NODE_BUF && Buffer.isBuffer(chunk)
+    }
+    return chunk
   }
 
   private _close() {
@@ -109,8 +112,15 @@ export class QuickReader<T extends Uint8Array = Uint8Array> {
     this._offset = 0
   }
 
+  private _allocator(len: number) {
+    if (this._isNodeBuf) {
+      return Buffer.allocUnsafe(len)
+    }
+    return new Uint8Array(len)
+  }
+
   private _concatBufs(bufs: Uint8Array[], len: number) : Uint8Array {
-    const ret = this.allocator(len)
+    const ret = this._allocator(len)
     let pos = 0
 
     for (let i = 0; i < bufs.length; i++) {
@@ -165,17 +175,20 @@ export class QuickReader<T extends Uint8Array = Uint8Array> {
   }
 
   private async _bytes(len: number) : Promise<T> {
-    const result = this.allocator(len) as T
-    const tail = this._buffer.subarray(this._offset)
+    let result: T | undefined
 
+    const tail = this._buffer.subarray(this._offset)
     let num = tail.length
-    result.set(tail, 0)
 
     for (;;) {
       const chunk = await this._pull()
       if (!chunk) {
         this._close()
         throw new QuickReaderError(QuickReaderErrorCode.NO_MORE_DATA)
+      }
+      if (!result) {
+        result = this._allocator(len) as T
+        result.set(tail, 0)
       }
       // |----------------------------------------------|
       // | *tail* | *chunks...* |       *chunk*         |

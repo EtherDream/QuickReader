@@ -15,29 +15,8 @@ export class QuickReaderError extends Error {
 export class QuickReader<T extends Uint8Array = Uint8Array> {
   /**
     `stream` can be a NodeStream or WebStream.
-
-    If the chunk type of the stream is not clear, you need to specify
-    the `T` manually, so that the same type can be obtained when reading
-    a buffer:
-
-    ```ts
-    const reader1 = new QuickReader<Buffer>(getStreamSomeHow())
-    reader1.bytes(10) ?? await A    // Buffer {...}
-
-    const reader2 = new QuickReader<Uint8Array>(getStreamSomeHow())
-    reader2.bytes(10) ?? await A    // Uint8Array {...}
-    ```
    */
   public constructor(stream: AsyncIterable<T> | ReadableStream<T>)
-
-  /**
-    A callback function for allocating a buffer, will be called when
-    reading a buffer across multiple chunks.
-
-    By default, `Buffer.allocUnsafe(len)` is used in Node.js and
-    `new Uint8Array(len)` is used in the browser.
-   */
-  public allocator: (len: number) => T
 
   /**
     Indicates whether the stream is closed and the buffer is empty.

@@ -195,15 +195,10 @@ More broadly, any `AsyncIterable<Uint8Array>` can be passed as a stream.
 
 * eofAsDelim: `boolean` (default `false`)
 
-## Callback
-
-* allocator: `(len: number) => T`
-
 ## More
 
 See [index.d.ts](typings/index.d.ts)
 
-> Note: The generic type `T` is only used for compile-time buffer type hints, and the runtime buffer type is returned by `allocator`. By default, Node.js uses `Buffer` and the browser uses `Uint8Array`.
 
 # Usage Rules
 
