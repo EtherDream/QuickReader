@@ -157,19 +157,19 @@ More broadly, any `AsyncIterable<Uint8Array>` can be passed as a stream.
 
 ## By length
 
-* bytes(len: `number`) : `T`
+* bytes(len: `number`) : `T` | undefined
 
-* skip(len: `number`) : `number`
+* skip(len: `number`) : `number` | undefined
 
-* txtNum(len: `number`) : `string`
+* txtNum(len: `number`) : `string` | undefined
 
 ## By delimiter
 
-* bytesTo(delim: `number`) : `T`
+* bytesTo(delim: `number`) : `T` | undefined
 
-* skipTo(delim: `number`) : `number`
+* skipTo(delim: `number`) : `number` | undefined
 
-* txtTo(delim: `number`) : `string`
+* txtTo(delim: `number`) : `string` | undefined
 
 ## Helper
 
@@ -179,15 +179,17 @@ More broadly, any `AsyncIterable<Uint8Array>` can be passed as a stream.
 
 ## Number
 
-* {u, i}{8, 16, 32, 16be, 32be}() : `number`
+* {u, i}{8, 16, 32, 16be, 32be}() : `number` | undefined
 
-* {u, i}{64, 64be}() : `bigint`
+* {u, i}{64, 64be}() : `bigint` | undefined
 
-* f{32, 64, 32be, 64be}() : `number`
+* f{32, 64, 32be, 64be}() : `number` | undefined
 
 ## Chunk
 
 * chunk(): `Promise<T>`
+
+* chunks(len): `AsyncGenerator<T>`
 
 ## Property
 
@@ -199,6 +201,37 @@ More broadly, any `AsyncIterable<Uint8Array>` can be passed as a stream.
 
 See [index.d.ts](typings/index.d.ts)
 
+
+# Buffer Type
+
+The generic type `T` can be used as a type hint for the buffer:
+
+```ts
+class QuickReader<T extends Uint8Array = Uint8Array> {
+
+  new(stream: AsyncIterable<T> | ReadableStream<T>)
+
+  public bytes(len: number) : T | undefined
+  public bytesTo(delim: number) : T | undefined
+}
+```
+
+If the type of `stream` is not clear, you need to specify `T` manually:
+
+```ts
+{
+  const reader = new QuickReader<Buffer>(fs.createReadStream('/path/to'))
+  const buffer = reader.bytes(10) ?? await A
+  buffer  // Type Hint: Buffer
+}
+{
+  const reader = new QuickReader<Uint8Array>(getStreamSomeHow())
+  const buffer = reader.bytes(10) ?? await A
+  buffer  // Type Hint: Uint8Array
+}
+```
+
+When `T` is explicit, methods like `bytes`, `bytesTo` etc. can get the expected return type hint.
 
 # Usage Rules
 
