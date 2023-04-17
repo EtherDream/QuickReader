@@ -157,19 +157,19 @@ More broadly, any `AsyncIterable<Uint8Array>` can be passed as a stream.
 
 ## By length
 
-* bytes(len: `number`) : `T` | undefined
+* bytes(len: `number`) : `T` | `undefined`
 
-* skip(len: `number`) : `number` | undefined
+* skip(len: `number`) : `number` | `undefined`
 
-* txtNum(len: `number`) : `string` | undefined
+* txtNum(len: `number`) : `string` | `undefined`
 
 ## By delimiter
 
-* bytesTo(delim: `number`) : `T` | undefined
+* bytesTo(delim: `number`) : `T` | `undefined`
 
-* skipTo(delim: `number`) : `number` | undefined
+* skipTo(delim: `number`) : `number` | `undefined`
 
-* txtTo(delim: `number`) : `string` | undefined
+* txtTo(delim: `number`) : `string` | `undefined`
 
 ## Helper
 
@@ -179,17 +179,15 @@ More broadly, any `AsyncIterable<Uint8Array>` can be passed as a stream.
 
 ## Number
 
-* {u, i}{8, 16, 32, 16be, 32be}() : `number` | undefined
+* {u, i}{8, 16, 32, 16be, 32be}() : `number` | `undefined`
 
-* {u, i}{64, 64be}() : `bigint` | undefined
+* {u, i}{64, 64be}() : `bigint` | `undefined`
 
-* f{32, 64, 32be, 64be}() : `number` | undefined
+* f{32, 64, 32be, 64be}() : `number` | `undefined`
 
 ## Chunk
 
 * chunk(): `Promise<T>`
-
-* chunks(len): `AsyncGenerator<T>`
 
 ## Property
 
@@ -288,8 +286,8 @@ do {
 Of course, as mentioned above, concurrency is not supported. If there are multiple co-routines reading the same file, it is better to use the native `readline` module:
 
 ```js
-import * as fs from 'node:fs'
-import * as readline from 'node:readline'
+import fs from 'node:fs'
+import readline from 'node:readline'
 
 const stream = fs.createReadStream('urls.txt')
 const rl = readline.createInterface({input: stream})
