@@ -2,9 +2,13 @@ type result_t = number | bigint | string | Uint8Array
 
 let gPromise: Promise<result_t>
 
+//
+// Use `never` to narrow down the types
+//
+// ```ts
 // const result = reader.txt()                ?? await A
-//  ✗    ↑ result_t  <=  ↑ string | undefined    ↑ result_t
-//  ✓    ↑ string    <=  ↑ string | undefined    ↑ never
+//       ↑ string    <=  ↑ string | undefined    ↑ never
+// ```
 export const A = {
   then(resolve: (result: typeof gPromise) => void) {
     resolve(gPromise)
@@ -21,6 +25,7 @@ export enum QuickReaderErrorCode {
 
 export class QuickReaderError extends Error {
   public readonly name = 'QuickReaderError'
+
   public constructor(
     public readonly code: QuickReaderErrorCode,
     desc?: any,
@@ -39,14 +44,19 @@ function isAsyncIterable(stream: any) : stream is AsyncIterable<any> {
   return typeof stream[Symbol.asyncIterator] === 'function'
 }
 
-const HAS_NODE_BUF = typeof Buffer === 'function' && !!Buffer?.prototype
+const NODE_BUFFER_PROTO = typeof Buffer === 'function' && Buffer.prototype
+const IS_NODE_BUFFER = NODE_BUFFER_PROTO && Buffer.isBuffer || (() => false)
+
 
 const bufToStr = (function() :
   (this: Uint8Array, begin: number, end: number) => string
 {
   // Node.js internal function, 10x faster
-  if (HAS_NODE_BUF) {
-    return Buffer.prototype.utf8Slice
+  if (NODE_BUFFER_PROTO) {
+    const {utf8Slice} = NODE_BUFFER_PROTO
+    if (utf8Slice) {
+      return utf8Slice
+    }
   }
   const textDecoder = new TextDecoder()
 
@@ -66,53 +76,35 @@ export class QuickReader<T extends Uint8Array = Uint8Array> {
   private _buffer = EMPTY_BUF
   private _offset = 0
   private _closed = false
-  private _getChunk: () => Promise<{value?: T}>
+  private _eof = false
+  private _nextChunk: () => Promise<{value?: T}>
   private _isNodeBuf: boolean | undefined
 
   public eofAsDelim = false
 
 
   public get eof() : boolean {
-    return this._closed
+    return this._eof
   }
 
   public constructor(stream: AsyncIterable<T> | ReadableStream<T>) {
     if (isAsyncIterable(stream)) {
       const obj = stream[Symbol.asyncIterator]()
-      this._getChunk = obj.next.bind(obj)
+      this._nextChunk = obj.next.bind(obj)
     } else {
       const obj = stream.getReader()
-      this._getChunk = obj.read.bind(obj)
+      this._nextChunk = obj.read.bind(obj)
     }
   }
 
-  protected async _pull() : Promise<T | undefined> {
-    if (this._closed) {
-      throw new QuickReaderError(QuickReaderErrorCode.NO_MORE_DATA)
-    }
-    let chunk: T | undefined
-
-    try {
-      const {value} = await this._getChunk()
-      chunk = value
-    } catch (err: any) {
-      this._close()
-      throw new QuickReaderError(QuickReaderErrorCode.FAILED_TO_PULL, err?.message)
-    }
-
-    if (this._isNodeBuf === undefined) {
-      this._isNodeBuf = HAS_NODE_BUF && Buffer.isBuffer(chunk)
-    }
-    return chunk
-  }
-
-  private _close() {
+  private _close() : void {
+    this._eof = true
     this._closed = true
     this._buffer = EMPTY_BUF
     this._offset = 0
   }
 
-  private _allocator(len: number) {
+  private _allocBuf(len: number) : Uint8Array {
     if (this._isNodeBuf) {
       return Buffer.allocUnsafe(len)
     }
@@ -120,7 +112,7 @@ export class QuickReader<T extends Uint8Array = Uint8Array> {
   }
 
   private _concatBufs(bufs: Uint8Array[], len: number) : Uint8Array {
-    const ret = this._allocator(len)
+    const ret = this._allocBuf(len)
     let pos = 0
 
     for (let i = 0; i < bufs.length; i++) {
@@ -131,20 +123,66 @@ export class QuickReader<T extends Uint8Array = Uint8Array> {
     return ret
   }
 
+  private async _pullChunk() : Promise<Uint8Array | undefined> {
+    if (this._closed) {
+      throw new QuickReaderError(QuickReaderErrorCode.NO_MORE_DATA)
+    }
+    let chunk: T | undefined
+
+    do {
+      try {
+        const {value} = await this._nextChunk()
+        chunk = value
+      } catch (err: any) {
+        this._close()
+        throw new QuickReaderError(QuickReaderErrorCode.FAILED_TO_PULL, err?.message)
+      }
+
+      if (!chunk) {
+        this._close()
+        return
+      }
+    } while (chunk.length === 0)
+
+    if (this._isNodeBuf === undefined) {
+      this._isNodeBuf = IS_NODE_BUFFER(chunk)
+    }
+    return chunk
+  }
+
   private async _pullAndReturn<R extends result_t>(result: R) : Promise<R> {
-    const chunk = await this._pull()
-    if (!chunk) {
-      this._close()
+    if (this._closed) {
+      this._eof = true
     } else {
-      this._buffer = chunk
-      this._offset = 0
+      await this._pullNoThrow()
     }
     return result
   }
 
+  private async _pullNoThrow() : Promise<void> {
+    try {
+      await this.pull()
+    } catch {
+    }
+  }
+
+
+  public async pull() : Promise<void> {
+    const chunk = await this._pullChunk()
+    if (chunk) {
+      this._buffer = chunk
+      this._offset = 0
+    }
+  }
+
+
   public async chunk() : Promise<T> {
     if (this._buffer === EMPTY_BUF) {
-      this._buffer = await this._pull() as T
+      const chunk = await this._pullChunk()
+      if (!chunk) {
+        throw new QuickReaderError(QuickReaderErrorCode.NO_MORE_DATA)
+      }
+      this._buffer = chunk
     }
     const result = this._offset
       ? this._buffer.subarray(this._offset)
@@ -152,6 +190,105 @@ export class QuickReader<T extends Uint8Array = Uint8Array> {
 
     return this._pullAndReturn(result as T)
   }
+
+
+  public async *chunks(len: number) : AsyncGenerator<T> {
+    len >>= 0
+    const buf = this._buffer
+    const pos = this._offset
+    const end = pos + len
+
+    if (end < buf.length) {
+      this._offset = end
+      yield buf.subarray(pos, end) as T
+      return
+    }
+
+    const tail = buf.subarray(pos)
+
+    if (end === buf.length) {
+      yield tail as T
+      await this._pullNoThrow()
+      return
+    }
+
+    if (tail.length) {
+      yield tail as T
+    }
+    let num = tail.length
+
+    for (;;) {
+      const chunk = await this._pullChunk()
+      if (!chunk) {
+        throw new QuickReaderError(QuickReaderErrorCode.NO_MORE_DATA)
+      }
+      // |----------------------------------------------|
+      // | *tail* | *chunks...* |       *chunk*         |
+      // |<------- num -------->|<--- chunk.length ---->|
+      // |<------------------- end -------------------->|
+      // |<------------ LEN ------------>|<-- exceed -->|
+      //                        | *head* |
+      const end = num + chunk.length
+      const exceed = end - len
+
+      if (exceed > 0) {
+        const head = chunk.subarray(0, -exceed)
+        yield head as T
+        this._offset = head.length
+        this._buffer = chunk
+        return
+      }
+      yield chunk as T
+
+      if (exceed === 0) {
+        await this._pullNoThrow()
+        return
+      }
+      num = end
+    }
+  }
+
+
+  public async *chunksToEnd(len: number) : AsyncGenerator<T> {
+    len >>>= 0
+    if (len === 0) {
+      while (!this._eof) {
+        yield await this.chunk()
+      }
+      return
+    }
+    if (len > QuickReader.maxQueueLen) {
+      throw new QuickReaderError(QuickReaderErrorCode.OUT_OF_RANGE, len)
+    }
+    const buf = this._buffer.subarray(this._offset)
+
+    if (buf.length > len) {
+      yield buf.subarray(0, -len) as T
+    }
+    let trailer = buf.subarray(-len)
+
+    for (;;) {
+      const chunk = await this._pullChunk()
+      if (!chunk) {
+        break
+      }
+      const bufLen = trailer.length + chunk.length
+      const buf = this._concatBufs([trailer, chunk], bufLen)
+
+      if (buf.length > len) {
+        yield buf.subarray(0, -len) as T
+      }
+      trailer = buf.subarray(-len)
+    }
+
+    if (trailer.length !== len) {
+      throw new QuickReaderError(QuickReaderErrorCode.NO_MORE_DATA)
+    }
+    this._eof = false
+    this._buffer = trailer
+    this._offset = 0
+  }
+
 
   public bytes(len: number) : T | undefined {
     len >>>= 0
@@ -175,19 +312,18 @@ export class QuickReader<T extends Uint8Array = Uint8Array> {
   }
 
   private async _bytes(len: number) : Promise<T> {
-    let result: T | undefined
+    let result: Uint8Array | undefined
 
     const tail = this._buffer.subarray(this._offset)
     let num = tail.length
 
     for (;;) {
-      const chunk = await this._pull()
+      const chunk = await this._pullChunk()
       if (!chunk) {
-        this._close()
         throw new QuickReaderError(QuickReaderErrorCode.NO_MORE_DATA)
       }
       if (!result) {
-        result = this._allocator(len) as T
+        result = this._allocBuf(len)
         result.set(tail, 0)
       }
       // |----------------------------------------------|
@@ -205,12 +341,12 @@ export class QuickReader<T extends Uint8Array = Uint8Array> {
         result.set(head, num)
         this._offset = head.length
         this._buffer = chunk
-        return result
+        return result as T
       }
       result.set(chunk, num)
 
       if (exceed === 0) {
-        return this._pullAndReturn(result)
+        return this._pullAndReturn(result as T)
       }
       num = end
     }
@@ -218,18 +354,18 @@ export class QuickReader<T extends Uint8Array = Uint8Array> {
 
 
   public bytesTo(delim: number) : T | undefined {
-    delim &= 0xff
+    delim &= 0xFF
     const buf = this._buffer
     const pos = this._offset
 
     const index = buf.indexOf(delim, pos)
     if (index !== -1) {
-      const result = buf.subarray(pos, index) as T
+      const result = buf.subarray(pos, index)
       const offset = index + 1
 
       if (offset !== buf.length) {
         this._offset = offset
-        return result
+        return result as T
       }
       gPromise = this._pullAndReturn(result)
     } else {
@@ -243,9 +379,8 @@ export class QuickReader<T extends Uint8Array = Uint8Array> {
     let queueLen = tail.length
 
     for (;;) {
-      const chunk = await this._pull()
+      const chunk = await this._pullChunk()
       if (!chunk) {
-        this._close()
         if (!this.eofAsDelim) {
           throw new QuickReaderError(QuickReaderErrorCode.NO_MORE_DATA)
         }
@@ -254,8 +389,7 @@ export class QuickReader<T extends Uint8Array = Uint8Array> {
 
       const index = chunk.indexOf(delim)
       if (index === -1) {
-        queueLen += chunk.length
-        if (queueLen > QuickReader.maxQueueLen) {
+        if ((queueLen += chunk.length) > QuickReader.maxQueueLen) {
           this._close()
           throw new QuickReaderError(QuickReaderErrorCode.MAX_QUEUE_EXCEED)
         }
@@ -270,16 +404,16 @@ export class QuickReader<T extends Uint8Array = Uint8Array> {
       queueArr.push(head)
       queueLen += head.length
 
-      const result = this._concatBufs(queueArr, queueLen) as T
+      const result = this._concatBufs(queueArr, queueLen)
       const offset = index + 1
 
       if (offset !== chunk.length) {
         this._offset = offset
         this._buffer = chunk
-        return result
+        return result as T
       }
       // offset max
-      return this._pullAndReturn(result)
+      return this._pullAndReturn(result as T)
     }
   }
 
@@ -305,9 +439,8 @@ export class QuickReader<T extends Uint8Array = Uint8Array> {
     let num = this._buffer.length - this._offset
 
     for (;;) {
-      const chunk = await this._pull()
+      const chunk = await this._pullChunk()
       if (!chunk) {
-        this._close()
         throw new QuickReaderError(QuickReaderErrorCode.NO_MORE_DATA)
       }
       const end = num + chunk.length
@@ -335,7 +468,7 @@ export class QuickReader<T extends Uint8Array = Uint8Array> {
 
 
   public skipTo(delim: number) : number | undefined {
-    delim &= 0xff
+    delim &= 0xFF
     const buf = this._buffer
     const pos = this._offset
 
@@ -357,9 +490,8 @@ export class QuickReader<T extends Uint8Array = Uint8Array> {
     let num = this._buffer.length - this._offset
 
     for (;;) {
-      const chunk = await this._pull()
+      const chunk = await this._pullChunk()
       if (!chunk) {
-        this._close()
         if (!this.eofAsDelim) {
           throw new QuickReaderError(QuickReaderErrorCode.NO_MORE_DATA)
         }
@@ -417,7 +549,7 @@ export class QuickReader<T extends Uint8Array = Uint8Array> {
 
 
   public txtTo(delim: number) : string | undefined {
-    delim &= 0xff
+    delim &= 0xFF
     const buf = this._buffer
     const pos = this._offset
 

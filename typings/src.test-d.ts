@@ -1,7 +1,10 @@
 import {QuickReader, A} from '../src/index'
-// copy from index.test-d.ts:1
 import {expectType} from 'tsd'
 import fs from 'fs'
+
+//
+// copy from index.test-d.ts:10
+//
 
 
 const nodeStream = fs.createReadStream('/tmp/1.txt')
@@ -28,13 +31,23 @@ const uint8ArrayReader = new QuickReader({
 expectType< QuickReader<Uint8Array> >(uint8ArrayReader)
 
 
-
 {
+  // pull
+  expectType<Promise<void>>(uint8ArrayReader.pull())
 
   // chunk
   expectType<Promise<Uint8Array>>(uint8ArrayReader.chunk())
   expectType<Promise<Buffer>>(bufferReader.chunk())
 
+  // chunks
+  expectType<AsyncGenerator<Uint8Array>>(uint8ArrayReader.chunks(10))
+  expectType<AsyncGenerator<Buffer>>(bufferReader.chunks(10))
+
+  // chunksToEnd
+  expectType<AsyncGenerator<Uint8Array>>(uint8ArrayReader.chunksToEnd(10))
+  expectType<AsyncGenerator<Buffer>>(bufferReader.chunksToEnd(10))
+}
+{
   // bytes
   expectType<Uint8Array | undefined>(uint8ArrayReader.bytes(10))
   expectType<Uint8Array | undefined>(uint8ArrayReader.bytesTo(32))

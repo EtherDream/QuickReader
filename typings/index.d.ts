@@ -1,4 +1,4 @@
-export const A: PromiseLike<never /* prevent type confusion */>
+export const A: PromiseLike<never>
 
 export const enum QuickReaderErrorCode {
   NO_MORE_DATA = 1,
@@ -39,6 +39,24 @@ export class QuickReader<T extends Uint8Array = Uint8Array> {
     Read a chunk from the stream.
    */
   public chunk() : Promise<T>
+
+  /**
+    Read data of specified length using async iteration
+   */
+  public chunks(len: number) : AsyncGenerator<T>
+
+  /**
+    Read all data until `len` bytes remaining.
+   */
+  public chunksToEnd(len: number) : AsyncGenerator<T>
+
+  /**
+    Pull a chunk from stream to the buffer.
+
+    This method is called at initialization so that eof can be detected
+    before the first read.
+   */
+  public pull() : Promise<void>
 
   /**
     Read *len* bytes.
