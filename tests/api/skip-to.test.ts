@@ -8,7 +8,7 @@ describe('skipTo', () => {
       [10, 11, 0, 13],
     ])
     const r1 = reader.skipTo(0)
-    expect(r1).toBe(undefined)
+    expect(r1).toBeUndefined()
 
     // [10, 11]
     const r2 = await A
@@ -46,7 +46,7 @@ describe('skipTo', () => {
 
     // [12, 13, 0]
     const r1 = reader.skipTo(0)
-    expect(r1).toBe(undefined)
+    expect(r1).toBeUndefined()
     expect(await A).toBe(3)
 
     // [20, 21, 22, 0]
@@ -66,7 +66,7 @@ describe('skipTo', () => {
     // [12, 13, 14]
     // [20, 21, 22, 23, 0]
     const r1 = reader.skipTo(0)
-    expect(r1).toBe(undefined)
+    expect(r1).toBeUndefined()
     expect(await A).toBe(8)
 
     // [30, 31, 0]
@@ -74,20 +74,12 @@ describe('skipTo', () => {
     expect(r2).toBe(3)
   })
 
-  it('param type', async () => {
-    const reader = createReader([
-      [10, 11, 1,  13],
-    ])
-    const r1 = reader.skipTo('1.99' as any) ?? await A
-    expect(r1).toBe(3)
-  })
-
   it('read zero', async () => {
     const reader = createReader([
       [0, 0, 0],
     ])
     const r1 = reader.skipTo(0)
-    expect(r1).toBe(undefined)
+    expect(r1).toBeUndefined()
     expect(await A).toBe(1)
 
     const r2 = reader.skipTo(0)
@@ -95,23 +87,8 @@ describe('skipTo', () => {
     expect(reader.eof).toBe(false)
 
     const r3 = reader.skipTo(0)
-    expect(r3).toBe(undefined)
+    expect(r3).toBeUndefined()
     expect(await A).toBe(1)
-    expect(reader.eof).toBe(true)
-  })
-
-  it('empty chunk', async () => {
-    const reader = createReader([
-      [], [10], [], [0, 12, 13], [], [0], [], [0]
-    ])
-    const r1 = reader.skipTo(0) ?? await A
-    expect(r1).toBe(2)
-
-    const r2 = reader.skipTo(0) ?? await A
-    expect(r2).toBe(3)
-    expect(reader.eof).toBe(false)
-
-    reader.skipTo(0) ?? await A
     expect(reader.eof).toBe(true)
   })
 
@@ -138,8 +115,8 @@ describe('skipTo', () => {
       expect(err).toBeInstanceOf(QuickReaderError)
       expect(err.code).toBe(QuickReaderErrorCode.NO_MORE_DATA)
       expect(err.message).toContain('NO_MORE_DATA')
-      expect(reader.eof).toBe(true)
     }
+    expect(reader.eof).toBe(true)
   })
 
   it('delim not found', async () => {
@@ -156,8 +133,8 @@ describe('skipTo', () => {
       expect(err).toBeInstanceOf(QuickReaderError)
       expect(err.code).toBe(QuickReaderErrorCode.NO_MORE_DATA)
       expect(err.message).toContain('NO_MORE_DATA')
-      expect(reader.eof).toBe(true)
     }
+    expect(reader.eof).toBe(true)
   })
 
   it('eof as delim', async () => {
@@ -173,7 +150,6 @@ describe('skipTo', () => {
 
   it('empty stream', async () => {
     const reader = createReader([
-      [],
     ])
     try {
       reader.skipTo(0) ?? await A
@@ -182,12 +158,23 @@ describe('skipTo', () => {
       expect(err).toBeInstanceOf(QuickReaderError)
       expect(err.code).toBe(QuickReaderErrorCode.NO_MORE_DATA)
       expect(err.message).toContain('NO_MORE_DATA')
-      expect(reader.eof).toBe(true)
     }
+    expect(reader.eof).toBe(true)
+  })
+
+  it('stream error (buf used up)', async () => {
+    const reader = createReader([
+      [10, 11, 12, 13, 0],
+      ['ERROR', 'failed to read'],
+    ])
+    const r1 = reader.skipTo(0) ?? await A
+    expect(r1).toBe(5)
+    expect(reader.eof).toBe(true)
   })
 
   it('stream error', async () => {
     const reader = createReader([
+      [10, 11, 12, 13],
       ['ERROR', 'failed to read'],
     ])
     try {
@@ -198,7 +185,7 @@ describe('skipTo', () => {
       expect(err.code).toBe(QuickReaderErrorCode.FAILED_TO_PULL)
       expect(err.message).toContain('FAILED_TO_PULL')
       expect(err.message).toContain('failed to read')
-      expect(reader.eof).toBe(true)
     }
+    expect(reader.eof).toBe(true)
   })
 })

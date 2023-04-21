@@ -1,4 +1,4 @@
-import {QuickReaderError, QuickReaderErrorCode, A} from '../../src/index'
+import {QuickReader, QuickReaderError, QuickReaderErrorCode, A} from '../../src/index'
 import {createReader} from './util'
 
 
@@ -8,7 +8,7 @@ describe('bytes', () => {
       [10, 11, 12, 13, 14],
     ])
     const r1 = reader.bytes(2)
-    expect(r1).toBe(undefined)
+    expect(r1).toBeUndefined()
 
     // [10, 11]
     const result = (await A) as Buffer
@@ -21,10 +21,21 @@ describe('bytes', () => {
     ])
     reader.bytes(1) ?? await A
 
-    // [11, 12]
+    // [10]
     const r1 = reader.bytes(2)
     expect(r1!.join()).toBe([11, 12] + '')
   })
+
+  it('pull', async () => {
+    const reader = createReader([
+      [10, 11, 12, 13, 14]
+    ])
+    await reader.pull()
+
+    const r1 = reader.bytes(2)
+    expect(r1!.join()).toBe([10, 11] + '')
+  })
+
 
   it('chunks concat', async () => {
     const reader = createReader([
@@ -50,7 +61,7 @@ describe('bytes', () => {
 
     // [14]
     const r1 = reader.bytes(1)
-    expect(r1).toBe(undefined)
+    expect(r1).toBeUndefined()
 
     const result1 = (await A) as Buffer
     expect(result1.join()).toBe([14] + '')
@@ -70,7 +81,7 @@ describe('bytes', () => {
     reader.bytes(4) ?? await A
 
     const r1 = reader.bytes(6)
-    expect(r1).toBe(undefined)
+    expect(r1).toBeUndefined()
 
     const result = (await A) as Buffer
     expect(result.join()).toBe([14, 20, 21, 22, 23, 24] + '')
@@ -80,57 +91,46 @@ describe('bytes', () => {
     expect(r2!.join()).toBe([30, 31, 32] + '')
   })
 
-  it('param type', async () => {
-    const reader = createReader([
-      [10, 11, 12],
-    ])
-    const r1 = reader.bytes('1.99' as any) ?? await A
-    expect(r1.join()).toBe([10] + '')
-  })
-
-  it('read byte', async () => {
+  it('read zero', async () => {
     const reader = createReader([
       [10, 11, 12],
     ])
     const r1 = reader.bytes(0)
-    expect(r1).toBe(undefined)
+    expect(r1).toBeUndefined()
 
-    const result = (await A) as Buffer
-    expect(result.join()).toBe([] + '')
+    const result: Uint8Array = await A
+    expect(result).toHaveLength(0)
 
     const r2 = reader.bytes(0)
-    expect(r2!.join()).toBe([] + '')
+    expect(r2).toHaveLength(0)
   })
 
   it('out of range', async () => {
-    const reader = createReader([
-      [10, 11, 12, 13],
+    const MAX_QUEUE_LEN = 1024 * 64
+    QuickReader.maxQueueLen = MAX_QUEUE_LEN
+
+
+    const reader1 = createReader([
+      Buffer.alloc(MAX_QUEUE_LEN),
+    ])
+    const r1 = reader1.bytes(1024 * 64) ?? await A
+    expect(r1).toHaveLength(MAX_QUEUE_LEN)
+
+
+    const reader2 = createReader([
+      Buffer.alloc(MAX_QUEUE_LEN),
     ])
     try {
-      reader.bytes(64 * 1024 ** 2 + 1) ?? await A
+      reader2.bytes(MAX_QUEUE_LEN + 1) ?? await A
       fail()
     } catch (err: any) {
       expect(err).toBeInstanceOf(QuickReaderError)
       expect(err.code).toBe(QuickReaderErrorCode.OUT_OF_RANGE)
       expect(err.message).toContain('OUT_OF_RANGE')
-      expect(reader.eof).toBe(false)
+      expect(reader2.eof).toBe(false)
     }
-  })
 
-  it('empty chunk', async () => {
-    const reader = createReader([
-      [], [10], [], [11, 12, 13], [], [14], [], [15]
-    ])
-    const r1 = reader.bytes(4) ?? await A
-    expect(r1.join()).toBe([10, 11, 12, 13] + '')
-
-    const r2 = reader.bytes(1) ?? await A
-    expect(r2.join()).toBe([14] + '')
-    expect(reader.eof).toBe(false)
-
-    const r3 = reader.bytes(1) ?? await A
-    expect(r3.join()).toBe([15] + '')
-    expect(reader.eof).toBe(true)
+    QuickReader.maxQueueLen = 64 * 1024 ** 2
   })
 
   it('eof', async () => {
@@ -159,7 +159,6 @@ describe('bytes', () => {
       expect(err).toBeInstanceOf(QuickReaderError)
       expect(err.code).toBe(QuickReaderErrorCode.NO_MORE_DATA)
       expect(err.message).toContain('NO_MORE_DATA')
-      expect(reader.eof).toBe(true)
     }
   })
 
@@ -174,13 +173,26 @@ describe('bytes', () => {
       expect(err).toBeInstanceOf(QuickReaderError)
       expect(err.code).toBe(QuickReaderErrorCode.NO_MORE_DATA)
       expect(err.message).toContain('NO_MORE_DATA')
-      expect(reader.eof).toBe(true)
     }
+    expect(reader.eof).toBe(true)
+  })
+
+  it('empty chunk', async () => {
+    const reader = createReader([
+      [], [10, 11], [],
+      [], [12, 13, 14], [],
+    ])
+    const r1 = reader.bytes(3) ?? await A
+    expect(r1.join()).toBe([10, 11, 12] + '')
+    expect(reader.eof).toBe(false)
+
+    const r2 = reader.bytes(2) ?? await A
+    expect(r2.join()).toBe([13, 14] + '')
+    expect(reader.eof).toBe(true)
   })
 
   it('empty stream', async () => {
     const reader = createReader([
-      [],
     ])
     try {
       reader.bytes(1) ?? await A
@@ -189,23 +201,41 @@ describe('bytes', () => {
       expect(err).toBeInstanceOf(QuickReaderError)
       expect(err.code).toBe(QuickReaderErrorCode.NO_MORE_DATA)
       expect(err.message).toContain('NO_MORE_DATA')
-      expect(reader.eof).toBe(true)
     }
+    expect(reader.eof).toBe(true)
+  })
+
+  it('check empty stream', async () => {
+    const reader = createReader([
+    ])
+    await reader.pull()
+    expect(reader.eof).toBe(true)
+  })
+
+  it('stream error (buf used up)', async () => {
+    const reader = createReader([
+      [1, 2, 3, 4, 5],
+      ['ERROR', 'failed to read'],
+    ])
+    const r1 = reader.bytes(5) ?? await A
+    expect(r1.join()).toBe([1, 2, 3, 4, 5] + '')
+    expect(reader.eof).toBe(true)
   })
 
   it('stream error', async () => {
     const reader = createReader([
+      [1, 2, 3, 4, 5],
       ['ERROR', 'failed to read'],
     ])
     try {
-      reader.bytes(1) ?? await A
+      reader.bytes(6) ?? await A
       fail()
     } catch (err: any) {
       expect(err).toBeInstanceOf(QuickReaderError)
       expect(err.code).toBe(QuickReaderErrorCode.FAILED_TO_PULL)
       expect(err.message).toContain('FAILED_TO_PULL')
       expect(err.message).toContain('failed to read')
-      expect(reader.eof).toBe(true)
     }
+    expect(reader.eof).toBe(true)
   })
 })

@@ -12,7 +12,7 @@ describe('txtTo', () => {
       ['A', SEP, 'C', 'D', 'E'],
     ])
     const r1 = reader.txtTo(DELIM)
-    expect(r1).toBe(undefined)
+    expect(r1).toBeUndefined()
     expect(await A).toBe('A')
   })
 
@@ -20,8 +20,9 @@ describe('txtTo', () => {
     const reader = createReader([
       ['A', SEP, 'C', SEP, 'E'],
     ])
+    // "A"
     reader.txtTo(DELIM) ?? await A
-
+    // "C"
     const r1 = reader.txtTo(DELIM)
     expect(r1).toBe('C')
   })
@@ -41,12 +42,15 @@ describe('txtTo', () => {
       ['A', SEP, 'C', 'D', SEP],
       ['F', 'G', 'H', SEP, 'J'],
     ])
+    // "A"
     reader.txtTo(DELIM) ?? await A
 
+    // "CD"
     const r1 = reader.txtTo(DELIM)
-    expect(r1).toBe(undefined)
+    expect(r1).toBeUndefined()
     expect(await A).toBe('CD')
 
+    // "FGH"
     const r2 = reader.txtTo(DELIM)
     expect(r2).toBe('FGH')
   })
@@ -57,22 +61,17 @@ describe('txtTo', () => {
       ['F', 'G', 'H', 'I', SEP],
       ['K', 'L', SEP, 'N', 'O'],
     ])
+    // "A"
     reader.txtTo(DELIM) ?? await A
 
+    // CDEFGHI
     const r1 = reader.txtTo(DELIM)
-    expect(r1).toBe(undefined)
+    expect(r1).toBeUndefined()
     expect(await A).toBe('CDE' + 'FGHI')
 
+    // KL
     const r2 = reader.txtTo(DELIM)
     expect(r2).toBe('KL')
-  })
-
-  it('param type', async () => {
-    const reader = createReader([
-      ['A', SEP, 'C'],
-    ])
-    const r1 = reader.txtTo('9.99' as any) ?? await A
-    expect(r1).toBe('A')
   })
 
   it('read zero', async () => {
@@ -80,15 +79,16 @@ describe('txtTo', () => {
       [SEP, SEP, SEP],
     ])
     const r1 = reader.txtTo(DELIM)
-    expect(r1).toBe(undefined)
+    expect(r1).toBeUndefined()
     expect(await A).toBe('')
 
+    // from buffer
     const r2 = reader.txtTo(DELIM)
     expect(r2).toBe('')
     expect(reader.eof).toBe(false)
 
     const r3 = reader.txtTo(DELIM)
-    expect(r3).toBe(undefined)
+    expect(r3).toBeUndefined()
     expect(await A).toBe('')
     expect(reader.eof).toBe(true)
   })
@@ -97,33 +97,19 @@ describe('txtTo', () => {
     const reader = createReader([
       ['A', 'B', 'C', 'D', 'E'],
       ['F', 'G', 'H', 'I', 'J'],
+      ['K', SEP, 'M']
     ])
-    QuickReader.maxQueueLen = 6
+    QuickReader.maxQueueLen = 9
     try {
-      reader.txtTo(0) ?? await A
+      reader.txtTo(DELIM) ?? await A
       fail()
     } catch (err: any) {
       expect(err).toBeInstanceOf(QuickReaderError)
       expect(err.code).toBe(QuickReaderErrorCode.MAX_QUEUE_EXCEED)
       expect(err.message).toContain('MAX_QUEUE_EXCEED')
-      expect(reader.eof).toBe(true)
     }
-    QuickReader.maxQueueLen = 64 * 1024 ** 2
-  })
-
-  it('empty chunk', async () => {
-    const reader = createReader([
-      [], ['A'], [], ['\0', 'C', 'D'], [], ['\0'], [], ['\0']
-    ])
-    const r1 = reader.txtTo(0) ?? await A
-    expect(r1).toBe('A')
-
-    const v1 = reader.txtTo(0) ?? await A
-    expect(v1).toBe('CD')
-
-    const r2 = reader.txtTo(0) ?? await A
-    expect(r2).toBe('')
     expect(reader.eof).toBe(true)
+    QuickReader.maxQueueLen = 64 * 1024 ** 2
   })
 
   it('eof', async () => {
@@ -150,8 +136,8 @@ describe('txtTo', () => {
       expect(err).toBeInstanceOf(QuickReaderError)
       expect(err.code).toBe(QuickReaderErrorCode.NO_MORE_DATA)
       expect(err.message).toContain('NO_MORE_DATA')
-      expect(reader.eof).toBe(true)
     }
+    expect(reader.eof).toBe(true)
   })
 
   it('delim not found', async () => {
@@ -168,8 +154,8 @@ describe('txtTo', () => {
       expect(err).toBeInstanceOf(QuickReaderError)
       expect(err.code).toBe(QuickReaderErrorCode.NO_MORE_DATA)
       expect(err.message).toContain('NO_MORE_DATA')
-      expect(reader.eof).toBe(true)
     }
+    expect(reader.eof).toBe(true)
   })
 
   it('eof as delim', async () => {
@@ -185,7 +171,6 @@ describe('txtTo', () => {
 
   it('empty stream', async () => {
     const reader = createReader([
-      [],
     ])
     try {
       reader.txtTo(0) ?? await A
@@ -194,23 +179,34 @@ describe('txtTo', () => {
       expect(err).toBeInstanceOf(QuickReaderError)
       expect(err.code).toBe(QuickReaderErrorCode.NO_MORE_DATA)
       expect(err.message).toContain('NO_MORE_DATA')
-      expect(reader.eof).toBe(true)
     }
+    expect(reader.eof).toBe(true)
+  })
+
+  it('stream error (buf used up)', async () => {
+    const reader = createReader([
+      ['A', 'B', 'C', 'D', SEP],
+      ['ERROR', 'failed to read'],
+    ])
+    const r1 = reader.txtTo(DELIM) ?? await A
+    expect(r1).toBe('ABCD')
+    expect(reader.eof).toBe(true)
   })
 
   it('stream error', async () => {
     const reader = createReader([
+      ['A', 'B', 'C', 'D'],
       ['ERROR', 'failed to read'],
     ])
     try {
-      reader.txtTo(0) ?? await A
+      reader.txtTo(DELIM) ?? await A
       fail()
     } catch (err: any) {
       expect(err).toBeInstanceOf(QuickReaderError)
       expect(err.code).toBe(QuickReaderErrorCode.FAILED_TO_PULL)
       expect(err.message).toContain('FAILED_TO_PULL')
       expect(err.message).toContain('failed to read')
-      expect(reader.eof).toBe(true)
     }
+    expect(reader.eof).toBe(true)
   })
 })

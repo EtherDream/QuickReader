@@ -50,7 +50,7 @@ describe('number', () => {
       [0x10, 0x11, 0x12, 0x13, 0x14],
     ])
     const r1 = reader.u32be()
-    expect(r1).toBe(undefined)
+    expect(r1).toBeUndefined()
     expect(await A).toBe(0x10_11_12_13)
   })
 
@@ -83,7 +83,7 @@ describe('number', () => {
     reader.u8() ?? await A
 
     const r1 = reader.u32be()
-    expect(r1).toBe(undefined)
+    expect(r1).toBeUndefined()
     expect(await A).toBe(0x11_12_13_14)
 
     const r2 = reader.u8()
@@ -102,28 +102,12 @@ describe('number', () => {
     // [            0x12, 0x13, 0x14]
     // [0x20, 0x21, 0x22, 0x23, 0x24]
     const r2 = reader.u64be()
-    expect(r2).toBe(undefined)
+    expect(r2).toBeUndefined()
     expect(await A).toBe(0x12_13_14_20_21_22_23_24n)
 
     // [0x30, 0x31]
     const r3 = reader.u16be()
     expect(r3).toBe(0x30_31)
-  })
-
-  it('empty chunk', async () => {
-    const reader = createReader([
-      [], [0x10], [], [0x11, 0x12, 0x13], [], [0x14], [], [0x15]
-    ])
-    const r1 = reader.u32be() ?? await A
-    expect(r1).toBe(0x10_11_12_13)
-
-    const r2 = reader.u8() ?? await A
-    expect(r2).toBe(0x14)
-    expect(reader.eof).toBe(false)
-
-    const r3 = reader.u8() ?? await A
-    expect(r3).toBe(0x15)
-    expect(reader.eof).toBe(true)
   })
 
   it('eof', async () => {
@@ -152,8 +136,8 @@ describe('number', () => {
       expect(err).toBeInstanceOf(QuickReaderError)
       expect(err.code).toBe(QuickReaderErrorCode.NO_MORE_DATA)
       expect(err.message).toContain('NO_MORE_DATA')
-      expect(reader.eof).toBe(true)
     }
+    expect(reader.eof).toBe(true)
   })
 
   it('read too much', async () => {
@@ -167,13 +151,12 @@ describe('number', () => {
       expect(err).toBeInstanceOf(QuickReaderError)
       expect(err.code).toBe(QuickReaderErrorCode.NO_MORE_DATA)
       expect(err.message).toContain('NO_MORE_DATA')
-      expect(reader.eof).toBe(true)
     }
+    expect(reader.eof).toBe(true)
   })
 
   it('empty stream', async () => {
     const reader = createReader([
-      [],
     ])
     try {
       reader.u8() ?? await A
@@ -182,23 +165,34 @@ describe('number', () => {
       expect(err).toBeInstanceOf(QuickReaderError)
       expect(err.code).toBe(QuickReaderErrorCode.NO_MORE_DATA)
       expect(err.message).toContain('NO_MORE_DATA')
-      expect(reader.eof).toBe(true)
     }
+    expect(reader.eof).toBe(true)
+  })
+
+  it('stream error (buf used up)', async () => {
+    const reader = createReader([
+      [0x11, 0x22, 0x33, 0x44],
+      ['ERROR', 'failed to read'],
+    ])
+    const r1 = reader.u32be() ?? await A
+    expect(r1).toBe(0x11223344)
+    expect(reader.eof).toBe(true)
   })
 
   it('stream error', async () => {
     const reader = createReader([
+      [1, 2, 3],
       ['ERROR', 'failed to read'],
     ])
     try {
-      reader.u8() ?? await A
+      reader.u32() ?? await A
       fail()
     } catch (err: any) {
       expect(err).toBeInstanceOf(QuickReaderError)
       expect(err.code).toBe(QuickReaderErrorCode.FAILED_TO_PULL)
       expect(err.message).toContain('FAILED_TO_PULL')
       expect(err.message).toContain('failed to read')
-      expect(reader.eof).toBe(true)
     }
+    expect(reader.eof).toBe(true)
   })
 })

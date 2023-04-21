@@ -65,7 +65,7 @@ describe('readline perf', () => {
       t2 = Date.now() - t
       expect(result.join('\n')).toBe(expStr)
     }
-    console.log('t1:', t1, 't2:', t2,)
+    console.log('(with payload) native ReadLine time:', t1, 'QuickReader time:', t2)
   })
 
 
@@ -76,8 +76,8 @@ describe('readline perf', () => {
       const rl = readline.createInterface({input: stream})
 
       const t = Date.now()
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       for await (const line of rl) {
+        line
       }
       t1 = Date.now() - t
     }
@@ -95,6 +95,6 @@ describe('readline perf', () => {
 
       t2 = Date.now() - t
     }
-    console.log('t1:', t1, 't2:', t2)
+    console.log('(without payload) native readline time:', t1, 'QuickReader time:', t2)
   })
 })
