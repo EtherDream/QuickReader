@@ -35,7 +35,7 @@ do {
 
 https://jsbin.com/loyuxad/edit?html,console
 
-With a stream reader, you can read the data in the specified format while downloading, which makes the user experience better. You don't have to do the chunk slicing and buffering yourself, the reader does all that.
+With a stream reader, you can read the data in the specified types while downloading, which makes the user experience better. You don't have to do the chunk slicing and buffering yourself, the reader does all that.
 
 Without it, you would have to wait for all the data to be downloaded before you could read it (e.g., via DataView). Since JS doesn't support structures, you have to pass in an offset parameter for each read, which is inconvenient to use.
 
@@ -135,14 +135,14 @@ In this way, the EOF state can be detected synchronously, nearly zero overhead.
 NodeStream is also supported:
 
 ```js
-const stream = fs.createReadStream('/path/to/file')
+const stream = fs.createReadStream('/path/to')
 const reader = new QuickReader(stream)
 // ...
 ```
 
-More broadly, any `AsyncIterable<Uint8Array>` can be passed as a stream.
+If the stream provides data as `Buffer`, buffer-related methods like `bytes`, `bytesTo`, etc. return `Buffer` as well, otherwise they return `Uint8Array`.
 
-> NodeStream has implemented [AsyncIterable](https://nodejs.org/api/stream.html#readablesymbolasynciterator) and the [Buffer](https://nodejs.org/api/buffer.html#buffer) is a subclass of Uint8Array.
+> [Buffer](https://nodejs.org/api/buffer.html#buffer) is a subclass of `Uint8Array`.
 
 
 # API
@@ -189,6 +189,10 @@ More broadly, any `AsyncIterable<Uint8Array>` can be passed as a stream.
 
 * chunk(): `Promise<T>`
 
+* chunks(len: number) : `AsyncGenerator<T>`
+
+* chunksToEnd(len: number) : `AsyncGenerator<T>`
+
 ## Property
 
 * eof: `boolean`
@@ -198,6 +202,37 @@ More broadly, any `AsyncIterable<Uint8Array>` can be passed as a stream.
 ## More
 
 See [index.d.ts](typings/index.d.ts)
+
+> Note: The program will not check the parameter `len`, but converts it to u32,  which may cause negative values become large numbers. So the caller needs to ensure that `len >= 0`. Similarly, the parameter `delim` will not be checked, but converted to u8.
+
+
+# EOF State
+
+Since the `eof` property is synchronized, it's meaningless until the first read.
+
+If the stream is expected to be non-empty, you can read before detecting:
+
+```js
+const reader = new QuickReader(stream)
+do {
+  const line = reader.txtLn() ?? await A
+} while (!reader.eof)
+```
+
+However, an error will be thrown when the stream is empty.
+
+If the empty stream needs to be considered, you can call `pull` method first, then the `eof` will be meaningful:
+
+```js
+const reader = new QuickReader(stream)
+await reader.pull()
+
+while (!reader.eof) {
+  const line = reader.txtLn() ?? await A
+}
+```
+
+In this way, no error will be thrown if the stream is empty.
 
 
 # Buffer Type
@@ -211,10 +246,14 @@ class QuickReader<T extends Uint8Array = Uint8Array> {
 
   public bytes(len: number) : T | undefined
   public bytesTo(delim: number) : T | undefined
+
+  public chunk() : Promise<T>
+  public chunks(len: number) : AsyncGenerator<T>
+  public chunksToEnd(len: number) : AsyncGenerator<T>
 }
 ```
 
-If the type of `stream` is not clear, you need to specify `T` manually:
+`T` is based on the type of the construction parameter `stream`, if it is not clear, you need to specify `T` manually:
 
 ```ts
 {
@@ -229,11 +268,63 @@ If the type of `stream` is not clear, you need to specify `T` manually:
 }
 ```
 
-When `T` is explicit, methods like `bytes`, `bytesTo` etc. can get the expected return type hint.
+When `T` is explicit, buffer-related methods can get the expected return type hint.
 
-# Usage Rules
 
-The `?? await A` must be executed immediately after each reading, otherwise something will go wrong. 
+# Chunk Reading
+
+## chunk
+
+When processing a large file, after reading the header, sometimes we want to read the remaining data chunk by chunk instead of all at once. In this case, we can use the `chunk` method:
+
+```js
+const header = reader.byte(10) ?? await A
+do {
+  const chunk = await reader.chunk()
+  // ...
+} while (!reader.eof)
+```
+
+Once this method is called, the amount of remaining data will be unpredictable, you can only call this method repeatedly.
+
+## chunks
+
+Using the `chunks` method, you can specify the read length:
+
+```js
+const ver = reader.u32() ?? await A
+const len = reader.u32() ?? await A
+
+for await (const chunk of reader.chunks(len)) {
+  // ...
+}
+
+const trailer = reader.bytes(8) ?? await A
+```
+
+In this way, after reading some chunks, you can continue to read data with types.
+
+> During iteration, calling other methods to read data is not allowed.
+
+## chunksToEnd
+
+This method will read all data until `len` bytes remaining, so that the trailer can be excluded.
+
+```ts
+const header = reader.bytes(10) ?? await A
+
+for await (const chunk of reader.chunksToEnd(8)) {
+  // ...
+}
+
+const trailer = reader.bytes(8) ?? await A
+```
+
+After calling this method, the stream is closed, and the buffer has `len` bytes.
+
+If `len` is `0`, it is similar to calling `chunk` method repeatedly.
+
+# Type Check
 
 It is better to use TypeScript. When you forget to add `?? await A`, the type of result will be unioned with `undefined`, which makes it easier to expose the issue.
 
@@ -242,15 +333,13 @@ const id = reader.u32()   // number | undefined
 id.toString()             // ❌
 ```
 
-Since the `A` is consumed immediately after it is generated, even if there are multiple `QuickReader` instances, they will not conflict with each other.
-
 
 # Concurrency
 
 The same reader is not allowed to be called by multiple co-routines in parallel, as this would break the waiting order. Therefore, the following logic should not be used:
 
 ```js
-reader = new QuickReader(stream)
+const reader = new QuickReader(stream)
 
 async function routine() {
   do {
@@ -259,6 +348,7 @@ async function routine() {
     // ...
   } while (!reader.eof)
 }
+
 // ❌
 for (let i = 0; i < 10; i++) {
   routine()
@@ -268,19 +358,20 @@ for (let i = 0; i < 10; i++) {
 
 # Read Line
 
-`QuickReader` can also be used for line-by-line reading. It reduces the overhead by ~60% compared to the Node.js' native `readline` module, because its parsing logic is simpler, e.g. using only `\n` delimiter (ignoring `\r`).
+`QuickReader` is also a high performance line reader. It reduces the overhead by ~60% compared to the Node.js' native `readline` module, because its parsing logic is simpler, e.g. using only `\n` delimiter (ignoring `\r`).
 
 ```js
 const stream = fs.createReadStream('log.txt')
 const reader = new QuickReader(stream)
+await reader.pull()
 
 // no error if the file does not end with '\n'
 reader.eofAsDelim = true
 
-do {
+while (!reader.eof) {
   const line = reader.txtLn() ?? await A
   // ...
-} while (!reader.eof)
+}
 ```
 
 Of course, as mentioned above, concurrency is not supported. If there are multiple co-routines reading the same file, it is better to use the native `readline` module:
