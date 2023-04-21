@@ -12,15 +12,6 @@ const webStream = await fetch('/')
 expectType< QuickReader<Uint8Array> >(new QuickReader(webStream.body!))
 
 
-class QuickReaderEx extends QuickReader {
-  protected async _pull(): Promise<Uint8Array | undefined> {
-    const chunk = await super._pull()
-    return chunk
-  }
-}
-new QuickReaderEx(new ReadableStream())
-
-
 const bufferReader = new QuickReader({
   [Symbol.asyncIterator]: async function*() {
     yield Buffer.alloc(1)

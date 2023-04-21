@@ -148,27 +148,4 @@ export class QuickReader<T extends Uint8Array = Uint8Array> {
 
   public f64be() : number | undefined
   public f32be() : number | undefined
-
-
-  /**
-    Override this method to intercept reading data from the stream.
-    Can be used for data decoding, decryption, etc.
-
-    ```
-    class QuickReaderEx extends QuickReader {
-      async _pull() {
-        const chunk = await super._pull()
-        if (chunk) {
-          for (let i = 0; i < chunk.length; i++) {
-            chunk[i] ^= 123
-          }
-        }
-        return chunk
-      }
-    }
-    ```
-    This is only used for simple processing, pipe the original stream to a
-    transform stream is the standard way.
-   */
-  protected _pull() : Promise<T | undefined>
 }
