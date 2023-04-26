@@ -129,6 +129,7 @@ This is both high-performance and easy-to-use.
 
 In this way, the EOF state can be detected synchronously, nearly zero overhead.
 
+> Note: If the data must be fully read before continuing (e.g. reading a handshake command from a socket stream and replying), do not use `QuickReader`, otherwise it will wait forever. `QuickReader` assumes that data can be read all the time, e.g. a file stream.
 
 # Node.js
 
